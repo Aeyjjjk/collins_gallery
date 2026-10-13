@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { site } from '../config/site'
 import { safeUrl } from '../lib/util'
 
-type Ico = ComponentType<{ size?: number }>
+type Ico = ComponentType<{ size?: number | string }>
 const svg = (d: string): Ico => ({ size = 20 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d={d} /></svg>
 )
@@ -48,8 +48,8 @@ export function Header() {
   }, [])
   return (
     <header className={'site-header' + (scrolled ? ' scrolled' : '')}>
-      <a href="#top" className="mark" aria-label="Top of page">Hello!!</a>
-      <nav aria-label="Primary"><a href="#work">Gallery</a><a href="#about">About</a></nav>
+      <a href="#top" className="mark" aria-label="Top of page">ECU</a>
+      <nav aria-label="Primary"><a href="#work">Work</a><a href="#about">About</a></nav>
     </header>
   )
 }
