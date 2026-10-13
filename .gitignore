@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+dist-ssr/
+*.tsbuildinfo
+
+# Environment files (keep the template, never the real values)
+.env
+.env.*
+!.env.example
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Editor and OS files
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Hosting tool folders
+.vercel/
+.netlify/
+
+# Supabase CLI local state
+supabase/.branches/
+supabase/.temp/
+
+# Test and cache output
+coverage/
+.cache/
+.vite/
