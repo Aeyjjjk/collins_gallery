@@ -2,18 +2,29 @@ name: Keep Supabase awake
 on:
   schedule:
     - cron: '0 */2 * * *'   # every 2 hours (UTC); GitHub may delay runs by several minutes
-  workflow_dispatch: {}      # lets you run it manually from the Actions tab
+  workflow_dispatch: {}      # lets you run it by hand from the Actions tab
 jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping database through the REST API
+      - name: Ping Supabase
         env:
-          URL: ${{ secrets.SUPABASE_URL }}
-          KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
-          set -e
-          code=$(curl -s -o /tmp/out -w '%{http_code}' -X POST "$URL/rest/v1/rpc/ping" \
-            -H "apikey: $KEY" -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{}')
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "::error::Add repository secrets SUPABASE_URL and SUPABASE_ANON_KEY (GitHub repo > Settings > Secrets and variables > Actions)."
+            exit 1
+          fi
+          url="${SUPABASE_URL%/}"
+          code=$(curl -sS -o /tmp/out -w '%{http_code}' -X POST "$url/rest/v1/rpc/ping" \
+            -H "apikey: $SUPABASE_ANON_KEY" -H "Content-Type: application/json" -d '{}') \
+            || { echo "::error::Could not reach $url. Check the SUPABASE_URL secret."; exit 1; }
           echo "HTTP $code"; cat /tmp/out; echo
-          [ "$code" = "200" ]
+          case "$code" in
+            200) echo "Supabase is awake." ;;
+            401) echo "::error::Key rejected. Re-copy the anon/publishable key into the SUPABASE_ANON_KEY secret."; exit 1 ;;
+            403) echo "::error::Permission denied. Run: grant execute on function public.ping() to anon, authenticated;"; exit 1 ;;
+            404) echo "::error::ping() not found. Run supabase/migrations/002_ping.sql in the Supabase SQL Editor."; exit 1 ;;
+            *)   echo "::error::Unexpected response $code."; exit 1 ;;
+          esac
