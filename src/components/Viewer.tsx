@@ -1,10 +1,9 @@
-import { ChevronLeft, ChevronRight, ExternalLink, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { site } from '../config/site'
+import { ChevronLeft, ChevronRight, ExternalLink, X } from 'lucide-react'
 import { mediaUrl } from '../lib/supabase'
 import { safeUrl } from '../lib/util'
-import type { Project } from '../types'
 import { isLive } from '../types'
+import type { Project } from '../types'
 
 const LINK_LABEL: Record<string, string> = { website: 'Visit website', application: 'Open app', prototype: 'View prototype' }
 
@@ -16,7 +15,6 @@ export default function Viewer({ items, index, onIndex, onClose }: {
   const touchX = useRef<number | null>(null)
   const [embed, setEmbed] = useState(false)
   const [failed, setFailed] = useState(false)
-  const [played, setPlayed] = useState(false)
   const many = items.length > 1
   const go = (d: number) => onIndex((index + d + items.length) % items.length)
 
@@ -26,7 +24,7 @@ export default function Viewer({ items, index, onIndex, onClose }: {
     root.current?.focus()
     return () => { document.body.style.overflow = ''; opener?.focus?.() }
   }, [])
-  useEffect(() => { setEmbed(false); setFailed(false); setPlayed(false) }, [index])
+  useEffect(() => { setEmbed(false); setFailed(false) }, [index])
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
@@ -65,14 +63,8 @@ export default function Viewer({ items, index, onIndex, onClose }: {
         {many && <button className="v-arrow l" aria-label="Previous" onClick={() => go(-1)}><ChevronLeft size={26} /></button>}
         {p.media_type === 'image' && <img className="v-media" src={src || thumb} alt={p.title} />}
         {p.media_type === 'video' && (src && !failed
-          ? (
-            <div className="v-wrap" key={p.id}>
-              <video className="v-media" controls playsInline preload="metadata" poster={thumb} src={src}
-                controlsList="nodownload noremoteplayback" disablePictureInPicture disableRemotePlayback
-                onPlay={() => setPlayed(true)} onError={() => setFailed(true)} />
-              {played && site.watermark.enabled && <span className="v-mark" aria-hidden="true">{(site.watermark.text || site.name).toUpperCase()}</span>}
-            </div>
-          )
+          ? <video key={p.id} className="v-media" controls playsInline preload="metadata" poster={thumb} src={src}
+              controlsList="nodownload noremoteplayback" disablePictureInPicture disableRemotePlayback onError={() => setFailed(true)} />
           : <div className="v-fallback"><img src={thumb} alt="" /><p>This video can't be played right now.</p></div>)}
         {live && (embed && url
           ? (
