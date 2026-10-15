@@ -51,51 +51,36 @@ export async function uploadWithProgress(path: string, file: Blob, onProgress?: 
   })
 }
 
-const MARK_FONT = 'Primus, Montserrat, "Avenir Next", "Segoe UI", system-ui, sans-serif'
-// Draws the centred watermark onto a canvas (no-op when disabled).
-export function mark(cv: HTMLCanvasElement) {
-  const w = site.watermark
-  if (!w.enabled) return
-  const ctx = cv.getContext('2d')!
-  const label = (w.text || site.name).toUpperCase()
-  ctx.save()
-  ctx.font = `700 100px ${MARK_FONT}`
-  const size = Math.min((100 * cv.width * w.width) / ctx.measureText(label).width, cv.height * 0.2)
-  ctx.font = `700 ${size}px ${MARK_FONT}`
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-  ctx.shadowColor = 'rgba(0,0,0,.45)'; ctx.shadowBlur = size * 0.15
-  ctx.fillStyle = `rgba(255,255,255,${w.opacity})`
-  ctx.fillText(label, cv.width / 2, cv.height / 2)
-  ctx.restore()
+const toBlob = (cv: HTMLCanvasElement, type: string, q?: number) =>
+  new Promise<Blob | null>((r) => cv.toBlob(r, type, q))
+
+// Decodes an image; falls back to an <img> element when createImageBitmap is unavailable or fails.
+async function decode(file: Blob): Promise<{ src: CanvasImageSource; w: number; h: number; done: () => void }> {
+  try {
+    const b = await createImageBitmap(file)
+    return { src: b, w: b.width, h: b.height, done: () => b.close() }
+  } catch {
+    const url = URL.createObjectURL(file)
+    try {
+      const img = new Image()
+      await new Promise<void>((res, rej) => { img.onload = () => res(); img.onerror = () => rej(new Error('the image could not be decoded')); img.src = url })
+      return { src: img, w: img.naturalWidth, h: img.naturalHeight, done: () => URL.revokeObjectURL(url) }
+    } catch (e) { URL.revokeObjectURL(url); throw e }
+  }
 }
 
-// Full-size watermarked copy (long side capped at 4096px).
-export async function imageMarked(file: File, maxSide = 4096) {
-  const bmp = await createImageBitmap(file)
-  const k = Math.min(1, maxSide / Math.max(bmp.width, bmp.height))
-  const cv = document.createElement('canvas')
-  cv.width = Math.round(bmp.width * k); cv.height = Math.round(bmp.height * k)
-  cv.getContext('2d')!.drawImage(bmp, 0, 0, cv.width, cv.height)
-  bmp.close()
-  mark(cv)
-  const want = file.type === 'image/png' || file.type === 'image/jpeg' ? file.type : 'image/webp'
-  const blob = await new Promise<Blob | null>((r) => cv.toBlob(r, want, 0.92))
-  if (!blob) throw new Error('Could not process the image.')
-  return { blob, ext: blob.type === 'image/jpeg' ? 'jpg' : blob.type === 'image/png' ? 'png' : 'webp' }
-}
-
-export async function imageThumb(file: Blob, max = 720, doMark = true) {
-  const bmp = await createImageBitmap(file)
-  const ar = bmp.width / bmp.height
-  const k = Math.min(1, max / bmp.width)
-  const cv = document.createElement('canvas')
-  cv.width = Math.round(bmp.width * k); cv.height = Math.round(bmp.height * k)
-  cv.getContext('2d')!.drawImage(bmp, 0, 0, cv.width, cv.height)
-  bmp.close()
-  if (doMark) mark(cv)
-  const blob = await new Promise<Blob | null>((r) => cv.toBlob(r, 'image/webp', 0.8))
-  if (!blob) throw new Error('Could not create thumbnail.')
-  return { blob, ar }
+export async function imageThumb(file: Blob, max = 720) {
+  const d = await decode(file)
+  try {
+    const ar = d.w / d.h
+    const k = Math.min(1, max / d.w)
+    const cv = document.createElement('canvas')
+    cv.width = Math.max(1, Math.round(d.w * k)); cv.height = Math.max(1, Math.round(d.h * k))
+    cv.getContext('2d')!.drawImage(d.src, 0, 0, cv.width, cv.height)
+    const blob = await toBlob(cv, 'image/webp', 0.8)
+    if (!blob) throw new Error('Could not create thumbnail.')
+    return { blob, ar }
+  } finally { d.done() }
 }
 
 export function videoFrame(file: File, max = 720) {
@@ -111,7 +96,6 @@ export function videoFrame(file: File, max = 720) {
       cv.width = Math.round(v.videoWidth * k); cv.height = Math.round(v.videoHeight * k)
       cv.getContext('2d')!.drawImage(v, 0, 0, cv.width, cv.height)
       const ar = v.videoWidth / v.videoHeight
-      mark(cv)
       cv.toBlob((b) => { clearTimeout(t); URL.revokeObjectURL(u); b ? res({ blob: b, ar }) : rej(new Error('thumb')) }, 'image/webp', 0.8)
     }
     v.onerror = () => fail('unreadable video')
@@ -129,25 +113,15 @@ export async function removeFiles(paths: (string | null | undefined)[]) {
 export async function storeMedia(cat: string, file: File, onProgress?: (n: number) => void) {
   const kind = validate(file)
   const id = crypto.randomUUID()
-  let body: File = file
-  let ext = (file.name.split('.').pop() || 'bin').toLowerCase().replace(/[^a-z0-9]/g, '')
-  if (kind === 'image' && site.watermark.enabled) {
-    try {
-      const m = await imageMarked(file)
-      ext = m.ext
-      body = new File([m.blob], `media.${ext}`, { type: m.blob.type })
-    } catch {
-      throw new Error(`${file.name}: this browser can't watermark this image. Try a JPG, PNG or WebP.`)
-    }
-  }
+  const ext = (file.name.split('.').pop() || 'bin').toLowerCase().replace(/[^a-z0-9]/g, '')
   const src = `${cat}/${id}/media.${ext}`
   const uploaded: string[] = []
   try {
-    await uploadWithProgress(src, body, onProgress)
+    await uploadWithProgress(src, file, onProgress)
     uploaded.push(src)
     let thumb: string | null = null, ar: number | null = null
     try {
-      const t = kind === 'image' ? await imageThumb(body, 720, body === file) : await videoFrame(file)
+      const t = kind === 'image' ? await imageThumb(file) : await videoFrame(file)
       const tp = `${cat}/${id}/thumb.webp`
       await uploadWithProgress(tp, new File([t.blob], 'thumb.webp', { type: 'image/webp' }))
       thumb = tp; uploaded.push(tp); ar = t.ar
