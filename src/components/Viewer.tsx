@@ -1,14 +1,16 @@
+import { ChevronLeft, ChevronRight, ExternalLink, Eye, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { ChevronLeft, ChevronRight, ExternalLink, X } from 'lucide-react'
 import { mediaUrl } from '../lib/supabase'
 import { safeUrl } from '../lib/util'
-import { isLive } from '../types'
+import { fmtViews, recordView } from '../lib/views'
 import type { Project } from '../types'
+import { isLive } from '../types'
 
 const LINK_LABEL: Record<string, string> = { website: 'Visit website', application: 'Open app', prototype: 'View prototype' }
 
-export default function Viewer({ items, index, onIndex, onClose }: {
+export default function Viewer({ items, index, onIndex, onClose, counts, onCount }: {
   items: Project[]; index: number; onIndex: (i: number) => void; onClose: () => void
+  counts?: Record<string, number>; onCount?: (id: string, n: number) => void // onCount present = public site, so views are recorded
 }) {
   const p = items[index]
   const root = useRef<HTMLDivElement>(null)
@@ -25,6 +27,10 @@ export default function Viewer({ items, index, onIndex, onClose }: {
     return () => { document.body.style.overflow = ''; opener?.focus?.() }
   }, [])
   useEffect(() => { setEmbed(false); setFailed(false) }, [index])
+  useEffect(() => {
+    if (!onCount) return
+    recordView(p.id).then((n) => { if (n !== null) onCount(p.id, n) })
+  }, [p.id])
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
@@ -79,6 +85,7 @@ export default function Viewer({ items, index, onIndex, onClose }: {
       <div className="v-info">
         <div>
           <h3>{p.title}</h3>
+          <p className="muted small views"><Eye size={14} aria-hidden="true" /> {fmtViews(counts?.[p.id] ?? p.view_count ?? 0)}</p>
           {p.description && <p className="muted">{p.description}</p>}
           {p.tags.length > 0 && <ul className="skills sm">{p.tags.map((t) => <li key={t}>{t}</li>)}</ul>}
         </div>

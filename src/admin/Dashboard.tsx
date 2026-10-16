@@ -6,6 +6,7 @@ import Viewer from '../components/Viewer'
 import { site } from '../config/site'
 import { mediaUrl, sb } from '../lib/supabase'
 import { em, safeUrl, slugify } from '../lib/util'
+import { fmtViews } from '../lib/views'
 import type { MediaType, Project } from '../types'
 import { isLive } from '../types'
 import { Act, D, must, ok, removeFiles, storeMedia, storeThumb, useAdminData, validate } from './api'
@@ -105,7 +106,7 @@ function Shell({ tab, setTab, menu, setMenu, msg, setMsg, signOut }: {
 function Overview({ d }: { d: D }) {
   const n = (f: (p: Project) => boolean) => d.projects.filter(f).length
   const stats: [string, number][] = [['Projects', d.projects.length], ['Images', n((p) => p.media_type === 'image')], ['Videos', n((p) => p.media_type === 'video')],
-    ['Live projects', n((p) => isLive(p.media_type))], ['Categories', d.cats.length], ['Featured', n((p) => p.featured)], ['Drafts', n((p) => !p.published)]]
+    ['Live projects', n((p) => isLive(p.media_type))], ['Categories', d.cats.length], ['Total views', d.projects.reduce((a, p) => a + (p.view_count || 0), 0)], ['Featured', n((p) => p.featured)], ['Drafts', n((p) => !p.published)]]
   return <><h1>Overview</h1><div className="stats">{stats.map(([l, v]) => <div className="stat" key={l}><b>{v}</b>{l}</div>)}</div></>
 }
 
@@ -143,7 +144,7 @@ function Media({ d, act }: { d: D; act: Act }) {
             <img className="th" loading="lazy" decoding="async" alt="" src={mediaUrl(p.thumb_path || p.src_path)} />
             <div className="bd"><b>{p.title}</b>
               <span><span className="badge">{p.media_type}</span>{!p.published && <span className="badge">draft</span>}{p.featured && <span className="badge g">featured</span>}</span>
-              <small className="muted">{label(p.category_id)}</small></div>
+              <small className="muted">{label(p.category_id)} · {fmtViews(p.view_count || 0)}</small></div>
             <div className="acts">
               <button className="icon" aria-label={`View ${p.title}`} title="View" onClick={() => setView(p)}><Eye size={18} /></button>
               <button className="icon" aria-label={`Edit ${p.title}`} title="Edit" onClick={() => setEdit({ p, mode: 'edit' })}><Pencil size={18} /></button>

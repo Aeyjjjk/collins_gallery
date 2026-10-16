@@ -9,6 +9,6 @@ export interface Project {
   media_type: MediaType; src_path: string | null; thumb_path: string | null
   aspect_ratio: number | null; description: string | null; tags: string[]
   year: number | null; featured: boolean; published: boolean; sort_order: number
-  project_url: string | null; source_url: string | null
+  project_url: string | null; source_url: string | null; view_count: number
 }
 export const isLive = (t: MediaType) => t === 'website' || t === 'application' || t === 'prototype'

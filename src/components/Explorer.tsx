@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router-dom'
 import { site } from '../config/site'
 import { useCatalog } from '../lib/data'
 import { mediaUrl } from '../lib/supabase'
+import { fmtViews } from '../lib/views'
 import type { Project } from '../types'
 import { isLive } from '../types'
 import Viewer from './Viewer'
@@ -12,7 +13,7 @@ const GROUPS = [['all', 'All'], ['image', 'Images'], ['video', 'Videos'], ['live
 const inGroup = (p: Project, g: string) => g === 'all' || (g === 'live' ? isLive(p.media_type) : p.media_type === g)
 const KIND: Record<string, string> = { image: 'Image', video: 'Video', website: 'Website', application: 'App', prototype: 'Prototype' }
 
-function Card({ p, onOpen, eager }: { p: Project; onOpen: () => void; eager: boolean }) {
+function Card({ p, onOpen, eager, views }: { p: Project; onOpen: () => void; eager: boolean; views: number }) {
   const [nat, setNat] = useState<number | null>(null) // measured ratio when none is stored
   const ar = p.aspect_ratio || nat || (p.media_type === 'video' ? 16 / 9 : 1)
   const live = isLive(p.media_type)
@@ -28,7 +29,7 @@ function Card({ p, onOpen, eager }: { p: Project; onOpen: () => void; eager: boo
           {p.media_type === 'video' && <span className="play" aria-hidden="true"><Play size={20} /></span>}
         </span>
       </span>
-      <span className="cap"><b>{p.title}</b><small>{[p.year, KIND[p.media_type]].filter(Boolean).join(' · ')}</small></span>
+      <span className="cap"><b>{p.title}</b><small>{[p.year, KIND[p.media_type], fmtViews(views)].filter(Boolean).join(' · ')}</small></span>
     </button>
   )
 }
@@ -39,6 +40,7 @@ export default function Explorer() {
   const c = sp.get('c') || '', f = sp.get('f') || 'all', t = sp.get('t') || 'all', q = sp.get('q') || ''
   const [limit, setLimit] = useState(site.limits.pageSize)
   const [open, setOpen] = useState<number | null>(null)
+  const [live, setLive] = useState<Record<string, number>>({}) // counts updated this session
 
   const set = (patch: Record<string, string>, push = true) => {
     const n = new URLSearchParams(sp)
@@ -141,14 +143,15 @@ export default function Explorer() {
           ) : (
             <>
               <ul className="masonry">
-                {visible.slice(0, limit).map((p, i) => <li key={p.id}><Card p={p} eager={i < 4} onOpen={() => setOpen(i)} /></li>)}
+                {visible.slice(0, limit).map((p, i) => <li key={p.id}><Card p={p} eager={i < 4} views={live[p.id] ?? p.view_count ?? 0} onOpen={() => setOpen(i)} /></li>)}
               </ul>
               {visible.length > limit && <button className="btn more" onClick={() => setLimit((l) => l + site.limits.pageSize)}>Show more</button>}
             </>
           )}
         </div>
       )}
-      {open !== null && visible[open] && <Viewer items={visible} index={open} onIndex={setOpen} onClose={() => setOpen(null)} />}
+      {open !== null && visible[open] && <Viewer items={visible} index={open} onIndex={setOpen} onClose={() => setOpen(null)}
+        counts={live} onCount={(id, n) => setLive((x) => ({ ...x, [id]: n }))} />}
     </section>
   )
 }
