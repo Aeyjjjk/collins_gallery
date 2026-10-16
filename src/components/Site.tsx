@@ -48,8 +48,8 @@ export function Header() {
   }, [])
   return (
     <header className={'site-header' + (scrolled ? ' scrolled' : '')}>
-      <a href="#top" className="mark" aria-label="Top of page">ECU</a>
-      <nav aria-label="Primary"><a href="#work">Work</a><a href="#about">About</a></nav>
+      <a href="#top" className="mark" aria-label="Top of page">Hello!!</a>
+      <nav aria-label="Primary"><a href="#work">Works</a><a href="#about">About</a></nav>
     </header>
   )
 }
